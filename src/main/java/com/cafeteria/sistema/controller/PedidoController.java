@@ -3,7 +3,7 @@ package com.cafeteria.sistema.controller;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map; 
+import java.util.Map;
 
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,8 +13,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.cafeteria.sistema.entity.DetallePedido;
+import com.cafeteria.sistema.entity.Insumo;
 import com.cafeteria.sistema.entity.Pedido;
+import com.cafeteria.sistema.entity.Receta;
+import com.cafeteria.sistema.repository.InsumoRepository;
 import com.cafeteria.sistema.repository.PedidoRepository;
+import com.cafeteria.sistema.repository.RecetaRepository;
 
 @RestController
 @RequestMapping("/api/pedidos")
@@ -22,18 +26,22 @@ import com.cafeteria.sistema.repository.PedidoRepository;
 public class PedidoController {
 
     private final PedidoRepository pedidoRepository;
+    private final RecetaRepository recetaRepository;
+    private final InsumoRepository insumoRepository;
 
-    public PedidoController(PedidoRepository pedidoRepository) {
+    public PedidoController(PedidoRepository pedidoRepository, 
+                            RecetaRepository recetaRepository, 
+                            InsumoRepository insumoRepository) {
         this.pedidoRepository = pedidoRepository;
+        this.recetaRepository = recetaRepository;
+        this.insumoRepository = insumoRepository;
     }
 
-    // 1. OBTENER TODOS LOS PEDIDOS
     @GetMapping
     public List<Pedido> listarPedidos() {
         return pedidoRepository.findAll();
     }
 
-    // 2. CREAR UN NUEVO PEDIDO
     @PostMapping
     public Pedido crearPedido(@RequestBody Pedido pedido) {
         pedido.setFecha(LocalDateTime.now());
@@ -41,12 +49,27 @@ public class PedidoController {
         if (pedido.getDetalles() != null) {
             for (DetallePedido detalle : pedido.getDetalles()) {
                 detalle.setPedido(pedido);
+
+                Long idProducto = detalle.getProducto().getId();
+                
+                List<Receta> recetas = recetaRepository.findByProductoId(idProducto);
+
+                for (Receta receta : recetas) {
+                    Insumo insumo = receta.getInsumo();
+                    
+                    Double cantidadAGastar = receta.getCantidadRequerida() * detalle.getCantidad();
+                    
+                    Double nuevoStock = insumo.getStockActual() - cantidadAGastar;
+                    
+                    insumo.setStockActual(nuevoStock);
+                    
+                    insumoRepository.save(insumo);
+                }
             }
         }
         return pedidoRepository.save(pedido);
     }
 
-    // 3. REPORTE DE CIERRE DE CAJA
     @GetMapping("/cierre-dia")
     public Map<String, Object> cierreCaja() {
         List<Pedido> todos = pedidoRepository.findAll();
@@ -57,9 +80,12 @@ public class PedidoController {
         LocalDateTime hoy = LocalDateTime.now();
 
         for (Pedido p : todos) {
-            // Verificamos si es de HOY
+            if (p.getFecha() == null) continue;
+
             if (p.getFecha().toLocalDate().equals(hoy.toLocalDate())) {
-                if ("EFECTIVO".equals(p.getMetodoPago())) {
+                String metodo = p.getMetodoPago() != null ? p.getMetodoPago() : "EFECTIVO";
+
+                if ("EFECTIVO".equals(metodo)) {
                     totalEfectivo += p.getTotal();
                 } else {
                     totalQR += p.getTotal();
