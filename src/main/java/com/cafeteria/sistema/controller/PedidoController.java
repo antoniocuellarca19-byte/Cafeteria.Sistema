@@ -3,6 +3,7 @@ package com.cafeteria.sistema.controller;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map; 
 
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,34 +27,28 @@ public class PedidoController {
         this.pedidoRepository = pedidoRepository;
     }
 
-    // 1. OBTENER TODOS LOS PEDIDOS (Para el cierre de caja después)
+    // 1. OBTENER TODOS LOS PEDIDOS
     @GetMapping
     public List<Pedido> listarPedidos() {
         return pedidoRepository.findAll();
     }
 
-    // 2. CREAR UN NUEVO PEDIDO (Esta es la magia)
+    // 2. CREAR UN NUEVO PEDIDO
     @PostMapping
     public Pedido crearPedido(@RequestBody Pedido pedido) {
-        // Asignamos la fecha y hora actual automáticamente
         pedido.setFecha(LocalDateTime.now());
         
-        // TRUCO IMPORTANTE:
-        // Como los detalles vienen "dentro" del pedido, a veces Java no sabe
-        // que pertenecen a ESTE pedido específico. Hacemos este bucle para decírselo.
         if (pedido.getDetalles() != null) {
             for (DetallePedido detalle : pedido.getDetalles()) {
-                detalle.setPedido(pedido); // "Tú perteneces a este pedido"
+                detalle.setPedido(pedido);
             }
         }
-
-        // Al guardar el 'padre' (pedido), se guardan solos los 'hijos' (detalles)
         return pedidoRepository.save(pedido);
     }
-    // 3. REPORTE DE CIERRE DE CAJA (Ventas de HOY)
+
+    // 3. REPORTE DE CIERRE DE CAJA
     @GetMapping("/cierre-dia")
     public Map<String, Object> cierreCaja() {
-        // Traemos todos los pedidos
         List<Pedido> todos = pedidoRepository.findAll();
         
         Double totalEfectivo = 0.0;
@@ -62,7 +57,7 @@ public class PedidoController {
         LocalDateTime hoy = LocalDateTime.now();
 
         for (Pedido p : todos) {
-            // Verificamos si el pedido es de HOY (mismo año, mes y día)
+            // Verificamos si es de HOY
             if (p.getFecha().toLocalDate().equals(hoy.toLocalDate())) {
                 if ("EFECTIVO".equals(p.getMetodoPago())) {
                     totalEfectivo += p.getTotal();
@@ -73,7 +68,6 @@ public class PedidoController {
             }
         }
 
-        // Creamos una respuesta ordenada tipo "Mapa" (Diccionario)
         Map<String, Object> reporte = new HashMap<>();
         reporte.put("fecha", hoy.toString());
         reporte.put("pedidos_hoy", cantidadPedidos);

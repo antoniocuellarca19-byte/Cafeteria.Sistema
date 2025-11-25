@@ -31,6 +31,28 @@ function App() {
     setTotal(0);
   }
 
+  // Función para consultar el cierre (AHORA ESTÁ FUERA, EN SU LUGAR CORRECTO)
+  const verCierreCaja = async () => {
+    try {
+      const res = await axios.get('http://localhost:8080/api/pedidos/cierre-dia');
+      const data = res.data;
+      
+      alert(`
+        📅 REPORTE DE HOY
+        ---------------------------
+        📝 Pedidos atendidos: ${data.pedidos_hoy}
+        
+        💵 Efectivo en Caja: $${data.total_efectivo}
+        📱 Cobrado por QR:   $${data.total_qr}
+        
+        💰 VENTA TOTAL:      $${data.total_general}
+      `);
+    } catch (error) {
+      console.error(error);
+      alert("Error al calcular el cierre");
+    }
+  }
+
   // Agregar producto al carrito
   const agregarProducto = (producto) => {
     setCarrito([...carrito, producto]);
@@ -66,7 +88,14 @@ function App() {
   if (!mesaSeleccionada) {
     return (
       <div className="container mt-5">
-        <h1 className="text-center mb-4">☕ Control de Mesas</h1>
+        {/* HEADER CON BOTÓN DE CIERRE */}
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <h1>☕ Control de Mesas</h1>
+          <button className="btn btn-dark" onClick={verCierreCaja}>
+            📊 Cierre de Caja
+          </button>
+        </div>
+
         <div className="row">
           {mesas.map((mesa) => (
             <div className="col-md-3 mb-4" key={mesa.id}>
@@ -75,7 +104,7 @@ function App() {
                   <h3>Mesa {mesa.numero}</h3>
                   <p>{mesa.estado}</p>
                   <button className="btn btn-light" onClick={() => abrirMesa(mesa)}>
-                    Abrir Mesa
+                    {mesa.estado === 'LIBRE' ? 'Abrir Mesa' : 'Ver Pedido'}
                   </button>
                 </div>
               </div>
