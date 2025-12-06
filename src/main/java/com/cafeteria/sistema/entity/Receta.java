@@ -19,7 +19,7 @@ public class Receta {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private Double cantidadRequerida; // Ej: 0.2 (para 200ml)
+    private Double cantidadRequerida; 
 
     @ManyToOne
     @JoinColumn(name = "id_insumo")

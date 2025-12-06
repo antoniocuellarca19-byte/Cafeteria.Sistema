@@ -13,16 +13,16 @@ public class SistemaApplication {
 		SpringApplication.run(SistemaApplication.class, args);
 	}
 
-    // ESTA ES LA CONFIGURACIÓN MAESTRA DE SEGURIDAD
+ 
     @Bean
     public WebMvcConfigurer corsConfigurer() {
         return new WebMvcConfigurer() {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
-                registry.addMapping("/**") // Aplica a TODAS las URLs
-                        .allowedOriginPatterns("*") // ¡Permite CUALQUIER origen! (Más potente que localhost)
-                        .allowedMethods("*") // Permite GET, POST, PUT, DELETE
-                        .allowedHeaders("*") // Permite cualquier cabecera
+                registry.addMapping("/**") 
+                        .allowedOriginPatterns("*") 
+                        .allowedMethods("*") 
+                        .allowedHeaders("*") 
                         .allowCredentials(true);
             }
         };

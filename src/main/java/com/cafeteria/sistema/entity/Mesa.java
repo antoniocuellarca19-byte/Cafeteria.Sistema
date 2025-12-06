@@ -1,4 +1,4 @@
-package com.cafeteria.sistema.entity; // <--- Importante: El paquete
+package com.cafeteria.sistema.entity; 
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;

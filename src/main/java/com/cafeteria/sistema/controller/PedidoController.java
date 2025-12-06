@@ -1,24 +1,13 @@
 package com.cafeteria.sistema.controller;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.transaction.annotation.Transactional; // Importante
+import org.springframework.web.bind.annotation.*;
 
-import com.cafeteria.sistema.entity.DetallePedido;
-import com.cafeteria.sistema.entity.Insumo;
-import com.cafeteria.sistema.entity.Pedido;
-import com.cafeteria.sistema.entity.Receta;
-import com.cafeteria.sistema.repository.InsumoRepository;
-import com.cafeteria.sistema.repository.PedidoRepository;
-import com.cafeteria.sistema.repository.RecetaRepository;
+import com.cafeteria.sistema.entity.*;
+import com.cafeteria.sistema.repository.*;
 
 @RestController
 @RequestMapping("/api/pedidos")
@@ -28,13 +17,16 @@ public class PedidoController {
     private final PedidoRepository pedidoRepository;
     private final RecetaRepository recetaRepository;
     private final InsumoRepository insumoRepository;
+    private final CierreDiarioRepository cierreRepository;
 
     public PedidoController(PedidoRepository pedidoRepository, 
                             RecetaRepository recetaRepository, 
-                            InsumoRepository insumoRepository) {
+                            InsumoRepository insumoRepository,
+                            CierreDiarioRepository cierreRepository) {
         this.pedidoRepository = pedidoRepository;
         this.recetaRepository = recetaRepository;
         this.insumoRepository = insumoRepository;
+        this.cierreRepository = cierreRepository;
     }
 
     @GetMapping
@@ -43,35 +35,41 @@ public class PedidoController {
     }
 
     @PostMapping
+    @Transactional // Asegura que todo ocurra en una sola transacción
     public Pedido crearPedido(@RequestBody Pedido pedido) {
         pedido.setFecha(LocalDateTime.now());
         
         if (pedido.getDetalles() != null) {
             for (DetallePedido detalle : pedido.getDetalles()) {
-                detalle.setPedido(pedido);
+                detalle.setPedido(pedido); // Vincula al padre
 
-                Long idProducto = detalle.getProducto().getId();
-                
-                List<Receta> recetas = recetaRepository.findByProductoId(idProducto);
+                // Lógica de Stock (Insumos)
+                if(detalle.getProducto() != null && detalle.getProducto().getId() != null) {
+                    Long idProducto = detalle.getProducto().getId();
+                    List<Receta> recetas = recetaRepository.findByProductoId(idProducto);
 
-                for (Receta receta : recetas) {
-                    Insumo insumo = receta.getInsumo();
-                    
-                    Double cantidadAGastar = receta.getCantidadRequerida() * detalle.getCantidad();
-                    
-                    Double nuevoStock = insumo.getStockActual() - cantidadAGastar;
-                    
-                    insumo.setStockActual(nuevoStock);
-                    
-                    insumoRepository.save(insumo);
+                    for (Receta receta : recetas) {
+                        Insumo insumo = receta.getInsumo();
+                        Double cantidadAGastar = receta.getCantidadRequerida() * detalle.getCantidad();
+                        Double nuevoStock = insumo.getStockActual() - cantidadAGastar;
+                        insumo.setStockActual(nuevoStock);
+                        insumoRepository.save(insumo);
+                    }
                 }
             }
         }
-        return pedidoRepository.save(pedido);
+        
+        // 1. Guardamos el pedido
+        Pedido pedidoGuardado = pedidoRepository.save(pedido);
+        
+        // 2. TRUCO: Refrescamos desde la base de datos para asegurar que 
+        // devuelva todos los detalles con sus nombres y IDs completos.
+        return pedidoRepository.findById(pedidoGuardado.getId()).orElse(pedidoGuardado);
     }
 
-    @GetMapping("/cierre-dia")
-    public Map<String, Object> cierreCaja() {
+    // Endpoint de Cierre de Caja (Incluido para mantener la funcionalidad anterior)
+    @PostMapping("/cierre-dia")
+    public CierreDiario realizarCierreCaja() {
         List<Pedido> todos = pedidoRepository.findAll();
         
         Double totalEfectivo = 0.0;
@@ -80,12 +78,9 @@ public class PedidoController {
         LocalDateTime hoy = LocalDateTime.now();
 
         for (Pedido p : todos) {
-            if (p.getFecha() == null) continue;
-
-            if (p.getFecha().toLocalDate().equals(hoy.toLocalDate())) {
+            if (p.getFecha() != null && p.getFecha().toLocalDate().equals(hoy.toLocalDate())) {
                 String metodo = p.getMetodoPago() != null ? p.getMetodoPago() : "EFECTIVO";
-
-                if ("EFECTIVO".equals(metodo)) {
+                if ("EFECTIVO".equalsIgnoreCase(metodo)) {
                     totalEfectivo += p.getTotal();
                 } else {
                     totalQR += p.getTotal();
@@ -94,13 +89,13 @@ public class PedidoController {
             }
         }
 
-        Map<String, Object> reporte = new HashMap<>();
-        reporte.put("fecha", hoy.toString());
-        reporte.put("pedidos_hoy", cantidadPedidos);
-        reporte.put("total_efectivo", totalEfectivo);
-        reporte.put("total_qr", totalQR);
-        reporte.put("total_general", totalEfectivo + totalQR);
+        CierreDiario cierre = new CierreDiario();
+        cierre.setFecha(hoy);
+        cierre.setCantidadPedidos(cantidadPedidos);
+        cierre.setTotalEfectivo(totalEfectivo);
+        cierre.setTotalQr(totalQR);
+        cierre.setTotalGeneral(totalEfectivo + totalQR);
 
-        return reporte;
+        return cierreRepository.save(cierre);
     }
 }

@@ -1,7 +1,10 @@
 package com.cafeteria.sistema.entity;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
@@ -12,31 +15,30 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
 @Entity
 @Table(name = "pedidos")
-@Data
+@Getter @Setter // Usamos Getter y Setter en lugar de @Data para evitar errores de listas
 public class Pedido {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private LocalDateTime fecha; // Fecha y hora exacta de la venta
+    private LocalDateTime fecha;
+    private Double total;
+    private String metodoPago; 
+    private String estado;
+    private String observacion; 
 
-    private Double total; // Cuánto dinero fue en total
-
-    private String metodoPago; // "EFECTIVO" o "QR"
-
-    private String estado; // "PENDIENTE" o "PAGADO"
-
-    @ManyToOne // Muchas ventas pueden ser de una misma mesa
+    @ManyToOne
     @JoinColumn(name = "id_mesa")
     private Mesa mesa;
     
-    // Esta parte es clave: Un pedido tiene una lista de detalles
-    // cascade = CascadeType.ALL significa: Si guardo el Pedido, guarda sus detalles automáticamente.
-    @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL)
-    private List<DetallePedido> detalles;
+    // @JsonManagedReference ayuda a que Java serialice la lista completa sin errores
+    @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference 
+    private List<DetallePedido> detalles = new ArrayList<>();
 }

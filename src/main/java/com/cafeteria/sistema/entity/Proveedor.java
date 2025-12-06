@@ -15,7 +15,7 @@ public class Proveedor {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String nombre; // Ej: "Lacteos del Valle"
-    private String categoria; // Ej: "Lacteos", "Pan", "Helado"
+    private String nombre; 
+    private String categoria; 
     private String telefono;
 }
